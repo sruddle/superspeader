@@ -1,0 +1,70 @@
+#########################
+#code used for transcriptomic analysis in Ruddle et al, CHOM 2023
+
+
+################################################################################
+# DOWNLOAD REFERENCE GENOME FILE FROM WEB DIRECTLY TO REMOTE #
+################################################################################
+
+## Copy download link address by right clicking hyperlink
+SALMONELLA_LINK=https://www.ebi.ac.uk/ena/browser/api/fasta/FQ312003.1?download=true
+
+-- gff https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/210/855/GCF_000210855.2_ASM21085v2/GCF_000210855.2_ASM21085v2_genomic.gff.gz
+
+-- fasta https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/210/855/GCF_000210855.2_ASM21085v2/GCF_000210855.2_ASM21085v2_genomic.fna.gz
+
+## Use wget to download and rename
+wget $genome -O sl1344_genome
+
+## unzip gz files
+gzip -d Salmonella_enterica_subsp_enterica_serovar_typhimurium_str_sl1344.ASM21085v2.46.gff3.gz
+
+################################################################################
+# RUN NF-CORE/RNASEQ PIPELINE (RUN IN 2019 USING DEV BRANCH)
+################################################################################
+
+cd /oak/stanford/scg/lab_dmonack/sruddle/super_shedder/RNA/analysis
+    nextflow run nf-core/rnaseq \
+        --input '/oak/stanford/scg/lab_dmonack/sruddle/super_shedder/code/config/rnaseq_ids_new.csv' \
+        --fasta '/oak/stanford/scg/lab_dmonack/shared/reference_genomes/sl1344/GCF_000210855.2_ASM21085v2_genomic.fna' \
+        --gff '/oak/stanford/scg/lab_dmonack/shared/reference_genomes/sl1344/GCF_000210855.2_ASM21085v2_genomic.gff' \
+        --aligner hisat2 \
+        --fc_count_type transcript \
+        -c /oak/stanford/scg/lab_dmonack/sruddle/super_shedder/code/config/nf_scg.config \
+        -profile singularity \
+        -with-singularity /labs/dmonack/shared/simg/rnaseq_dev.sif \
+        --outdir /oak/stanford/scg/lab_dmonack/sruddle/super_shedder/RNA/20201021_analysis \
+        --pull_docker_container \
+        -r dev
+
+################################################################################
+#RUN DESEQ2 ANALYSIS
+# working in R #
+################################################################################
+
+## prepare workspace
+library(tidyverse)
+library(DESeq2)
+
+#load in count matrix
+cts <- read.csv("/home/sruddle/R/data/genecounts_all.csv",stringsAsFactors = TRUE)
+
+#rename first column as row names
+cts2 <- cts[,-1]
+rownames(cts2) <- cts[,1]
+
+#remove gene name column
+cts2$gene_name <- NULL
+
+#load in sample annotations
+coldata <- read.csv("/home/sruddle/R/data/sample_info.csv",stringsAsFactors = TRUE)
+
+##run deseq2
+dds <- DESeqDataSetFromMatrix(countData = cts2,
+                              colData = coldata,
+                              design = ~ time_point)
+dds <- DESeq(dds)
+
+resultsNames(dds)
+
+res <- results(dds, name="in_vivo_vs_in_vitro")
