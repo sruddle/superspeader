@@ -1,6 +1,2 @@
 # superspeader
-code for RNA sequencing analysis : nfcore-rnaseq and deseq2
-
-
-
-Associated with Ruddle et al. 2023
+code for Salmonella Typhimurium transcriptional profiling from Ruddle et al, Cell Host & Microbe 2023
